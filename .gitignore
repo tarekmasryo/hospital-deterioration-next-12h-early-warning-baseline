@@ -7,3 +7,15 @@ __pycache__/
 env/
 venv/
 ENV/
+
+# Local data (not committed)
+/data/raw/*.csv
+
+# Generated outputs (not committed)
+/artifacts/*.csv
+/artifacts/*.pkl
+/artifacts/*.json
+/artifacts/*.joblib
+
+# Virtualenv
+.venv/

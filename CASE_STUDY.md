@@ -1,57 +1,105 @@
-# Case Study — Hospital Deterioration Next 12 Hours (Early Warning Baseline)
+# Case Study — Hospital Deterioration Next-12h Early Warning Baseline
 
-## Overview
-This project provides a decision-ready baseline for predicting **clinical deterioration in the next 12 hours** from a hospital cohort.
+## Problem
 
-The key deliverables are:
-- calibrated risk scores suitable for alert thresholds
-- threshold policies that make trade-offs explicit (missed events vs alert volume)
-- exportable artifacts (models + policy tables) for downstream dashboards or simulations
+Hospital deterioration prediction is a high-imbalance alerting task. The challenge is not only to rank risky observations, but also to understand whether the signal is strong enough to support a practical alert policy.
 
-## The real problem
-Early warning systems have asymmetric costs:
-- **False negatives** can delay escalation and increase clinical risk.
-- **False positives** create alert fatigue and burn staff attention.
+A useful early-warning workflow should make these trade-offs explicit:
 
-A model metric alone is not an operating plan. The workflow must produce a **clear threshold policy** that matches capacity and risk tolerance.
+- missed deterioration windows,
+- false alerts,
+- review burden,
+- leakage risk,
+- threshold selection.
 
-## Goals (definition of done)
-**Functional goals**
-- train strong tabular baselines on an ML-ready panel
-- output calibrated probabilities where possible
-- provide threshold views for different regimes (balanced, high recall, low alerts)
+This project uses a synthetic hospital deterioration dataset to build a clean baseline for predicting whether an hourly observation falls within the next 12 hours before deterioration.
 
-**Engineering goals**
-- leak-safe evaluation (no fitting on the holdout)
-- reproducible training (seeded splits)
-- exported artifacts for downstream use
+## Dataset
+
+The workflow uses five CSV files:
+
+- `patients.csv`
+- `vitals_timeseries.csv`
+- `labs_timeseries.csv`
+- `hospital_deterioration_hourly_panel.csv`
+- `hospital_deterioration_ml_ready.csv`
+
+The joined hourly panel is the main modeling table because it preserves `patient_id`, which is required for patient-level splitting.
 
 ## Approach
-### 1) Baselines that fit clinical ops constraints
-The notebook trains multiple CPU-friendly baselines (e.g., Logistic Regression, HistGradientBoosting).
-If XGBoost is available in the environment, it can be included as an optional stronger baseline.
 
-### 2) Probability calibration and decision thresholds
-The workflow emphasizes probabilities and thresholds:
-- calibration improves the meaning of risk scores
-- thresholds convert scores into actions under a specific operating regime
+### 1. Validate before modeling
 
-### 3) Outputs for decision-making
-The notebook exports:
-- trained model artifacts
-- policy tables with thresholds for different alerting regimes
+The notebook starts with structural checks:
 
-These outputs are designed to plug into:
-- alert simulators
-- ward/unit dashboards
-- retrospective evaluations
+- patient IDs align across tables,
+- hourly keys are unique,
+- panel row count matches the total length of stay,
+- the next-12h label matches the documented definition,
+- oxygen-flow edge cases are inspected in both directions.
+
+This prevents the notebook from looking polished while hiding dataset issues.
+
+### 2. Explore the early-warning signal
+
+The EDA focuses on questions that matter for the modeling task:
+
+- target imbalance,
+- deterioration timing,
+- baseline risk score behavior,
+- vital-sign and lab trajectories,
+- pre-event aligned signal movement.
+
+The goal is to validate whether the dataset contains plausible deterioration patterns before fitting a model.
+
+### 3. Use leakage-aware evaluation
+
+The split is performed at the patient level. This avoids training on some hours from a patient and testing on other hours from the same patient.
+
+The model excludes identifiers, future labels, event metadata, and the simulator-generated latent `baseline_risk_score`.
+
+### 4. Train a simple baseline
+
+The baseline uses:
+
+- preprocessing inside an `sklearn` pipeline,
+- median imputation for numeric features,
+- most-frequent imputation and one-hot encoding for categorical features,
+- logistic regression with class balancing.
+
+This is intentionally simple, reproducible, and easy to inspect.
+
+### 5. Convert scores into an alert policy
+
+The notebook reports ranking quality with ROC AUC and Average Precision, then evaluates threshold trade-offs using:
+
+- precision,
+- recall,
+- F1,
+- false positives,
+- false negatives,
+- alert rate.
+
+Average Precision is emphasized because the positive next-12h rows are imbalanced.
+
+## Key decisions
+
+- Use the hourly panel rather than only the ML-ready table because patient-level splitting requires `patient_id`.
+- Keep the first baseline interpretable and reproducible instead of jumping directly to heavier models.
+- Treat threshold selection as an operational decision rather than using an arbitrary 0.50 cutoff.
+- Present oxygen-flow anomalies as a simulation/documentation edge case, not a modeling blocker.
 
 ## Limitations
-- This is a baseline workflow template, not a certified medical device.
-- Real deployment requires governance: clinical validation, monitoring, and regulatory review where applicable.
-- Performance and calibration can drift across sites, seasons, and patient mixes.
+
+- The dataset is synthetic and not suitable for clinical deployment.
+- The baseline is row-level; patient-level alert burden should be added before any operational prototype.
+- Predicted scores should be calibrated before being interpreted as probabilities.
+- Additional temporal features and stronger models may improve ranking performance, but they should use the same patient-level split.
 
 ## Next steps
-- add slice reporting (ward, age band, comorbidity groups) for fairness and safety checks
-- evaluate alert burden explicitly (alerts per 100 patient-hours)
-- monitor calibration drift and retrain triggers over time
+
+- Add rolling-window and volatility features over recent vitals/labs.
+- Compare tree-based models under the same split.
+- Add calibration curves, Brier score, and calibration-aware threshold discussion.
+- Evaluate alerts per patient and per 100 patient-hours.
+- Package the final pipeline into a batch scoring function or API-ready component.

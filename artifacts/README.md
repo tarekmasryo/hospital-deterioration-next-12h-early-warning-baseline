@@ -1,9 +1,12 @@
 # artifacts
 
-Generated outputs from the notebook (not committed by default).
+This folder is reserved for generated outputs.
 
-Typical outputs:
-- `model_logreg.pkl`, `model_hgb.pkl`, `model_xgb.pkl` (optional)
-- `policy_thresholds_balanced.csv`
-- `policy_thresholds_high_recall.csv`
-- `policy_thresholds_low_alerts.csv`
+The current notebook focuses on validation, EDA, baseline modeling, and alert-policy analysis. If you extend it with export steps, this folder can store:
+
+- trained pipeline files,
+- threshold policy tables,
+- metrics summaries,
+- batch scoring outputs.
+
+Generated artifacts are ignored by Git by default.

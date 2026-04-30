@@ -216,4 +216,4 @@ Strong next steps:
 
 MIT License. See [LICENSE](LICENSE) for details.
 
-Copyright © Tarek Masryo.
+
